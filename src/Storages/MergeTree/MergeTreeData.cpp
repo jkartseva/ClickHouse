@@ -1,3 +1,4 @@
+#include "Storages/PartitionCommands.h"
 #include <Storages/MergeTree/MergeTreeData.h>
 
 #include <Access/AccessControl.h>
@@ -5375,7 +5376,9 @@ void MergeTreeData::checkAlterPartitionIsPossible(
                                 "is disabled (see allow_drop_detached setting)");
 
         if (disk_without_hardlink_support_it != disks.end() && command.type != PartitionCommand::DROP_PARTITION
-            && command.type != PartitionCommand::DROP_DETACHED_PARTITION)
+            && command.type != PartitionCommand::DROP_DETACHED_PARTITION
+            && command.type != PartitionCommand::ATTACH_PARTITION
+            && command.type != PartitionCommand::MOVE_PARTITION)
             throw Exception(
                 ErrorCodes::SUPPORT_IS_DISABLED,
                 "Partition operation ALTER TABLE {} is not supported for immutable disk '{}'",

@@ -125,6 +125,8 @@ public:
         /// Noop
     }
 
+    virtual void setReadOnly(const std::string & path) override;
+
     void createEmptyMetadataFile(const std::string & /* path */) override;
 
     void createMetadataFile(const std::string & /* path */, ObjectStorageKey /* object_key */, uint64_t /* size_in_bytes */) override;
@@ -137,6 +139,11 @@ public:
 
     void unlinkFile(const std::string & path) override;
     void removeDirectory(const std::string & path) override;
+
+    /// Hard links are not yet implemented; copying is used instead
+    void createHardLink(const std::string & path_from, const std::string & path_to) override;
+
+    void moveFile(const std::string & path_from, const std::string & path_to) override;
 
     UnlinkMetadataFileOperationOutcomePtr unlinkMetadata(const std::string & path) override;
 

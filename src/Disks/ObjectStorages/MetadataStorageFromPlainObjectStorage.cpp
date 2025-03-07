@@ -1,4 +1,6 @@
 #include "MetadataStorageFromPlainObjectStorage.h"
+#include "Common/Logger.h"
+#include "IO/WriteSettings.h"
 
 #include <Disks/IDisk.h>
 #include <Disks/ObjectStorages/MetadataStorageFromPlainObjectStorageOperations.h>
@@ -194,6 +196,12 @@ const IMetadataStorage & MetadataStorageFromPlainObjectStorageTransaction::getSt
     return metadata_storage;
 }
 
+void MetadataStorageFromPlainObjectStorageTransaction::setReadOnly(const std::string & path)
+{
+    LOG_TRACE(getLogger("MetadataStorageFromPlainObjectStorageTransaction"),
+            "Setting path '{}' for read only", path);
+}
+
 void MetadataStorageFromPlainObjectStorageTransaction::unlinkFile(const std::string & path)
 {
     auto object_key = metadata_storage.object_storage->generateObjectKeyForPath(path, std::nullopt /* key_prefix */);
@@ -213,6 +221,25 @@ void MetadataStorageFromPlainObjectStorageTransaction::removeDirectory(const std
         addOperation(std::make_unique<MetadataStorageFromPlainObjectStorageRemoveDirectoryOperation>(
             normalizeDirectoryPath(path), *metadata_storage.getPathMap(), object_storage, metadata_storage.getMetadataKeyPrefix()));
     }
+}
+
+/// Use a copy for now.
+void MetadataStorageFromPlainObjectStorageTransaction::createHardLink(
+        const std::string & path_from, const std::string & path_to)
+{
+    LOG_TRACE(getLogger("MetadataStorageFromPlainObjectStorageTransaction"),
+            "Creating hardlink from '{}' to '{}'", path_from, path_to);
+
+    addOperation(std::make_unique<MetadataStorageFromPlainObjectStorageCopyOperation>(
+                path_from, path_to, *metadata_storage.getPathMap(), object_storage));
+}
+
+void MetadataStorageFromPlainObjectStorageTransaction::moveFile(const std::string & path_from, const std::string & path_to)
+{
+    if (metadata_storage.existsDirectory(path_from))
+        moveDirectory(path_from, path_to);
+    else
+        throwNotImplemented();
 }
 
 void MetadataStorageFromPlainObjectStorageTransaction::createEmptyMetadataFile(const std::string & path)
