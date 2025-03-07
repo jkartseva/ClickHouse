@@ -45,42 +45,53 @@ def start_cluster():
 
 def test():
     node1 = cluster.instances["node1"]
-    def create_insert(node, insert_values):
+    def create_insert(node, table_name, insert_values):
         node.query(
             """
-            CREATE TABLE test (
+            CREATE TABLE {} (
                 id Int64,
                 data String
             ) ENGINE=MergeTree()
             ORDER BY id
             SETTINGS storage_policy='s3_plain_rewritable'
-            """
+            """.format(table_name)
         )
-        node.query("INSERT INTO test VALUES {}".format(insert_values))
+        node.query("INSERT INTO {} VALUES {}".format(table_name, insert_values))
 
-    create_insert(node1, gen_insert_values(1000))
+    create_insert(node1, 'test1', gen_insert_values(1000))
 
-    assert int(node1.query("SELECT count(*) FROM test")) == 1000
+    assert int(node1.query("SELECT count(*) FROM test1")) == 1000
 
-    uuid1 = node1.query("SELECT uuid FROM system.tables WHERE table='test'").strip()
+    uuid1 = node1.query("SELECT uuid FROM system.tables WHERE table='test1'").strip()
     logging.info(f"UUID {uuid1}")
-    node1.query("DETACH TABLE test")
+
+    create_insert(node1, 'test2', gen_insert_values(1000))
+    assert int(node1.query("SELECT count(*) FROM test2")) == 1000
+
+    uuid2 = node1.query("SELECT uuid FROM system.tables WHERE table='test2'").strip()
+    logging.info(f"UUID {uuid2}")
+
+    node1.query("DETACH TABLE test1")
+    node1.query("DETACH TABLE test2")
     node1.stop()
 
     node2 = cluster.instances["node2"]
-    node2.query(
-    f'''ATTACH TABLE test_rotated1 UUID '{uuid1}' (id Int64, data String)
-    ENGINE=MergeTree()
-    ORDER BY id
-    SETTINGS disk=disk(
-        type=object_storage,
-        object_storage_type=s3,
-        metadata_type=plain_rewritable,
-        endpoint='http://minio1:9001/root/data/',
-        endpoint_subpath='node1',
-        access_key_id='minio',
-        secret_access_key='minio123')
-    ''')
+    for (name, uuid) in [('test1', uuid1), ('test2', uuid2)]:
+        node2.query(
+        f'''ATTACH TABLE test_rotated_{name} UUID '{uuid}' (id Int64, data String)
+        ENGINE=MergeTree()
+        ORDER BY id
+        SETTINGS disk=disk(
+            name=my_disk,
+            type=object_storage,
+            object_storage_type=s3,
+            metadata_type=plain_rewritable,
+            endpoint='http://minio1:9001/root/data/',
+            endpoint_subpath='node1',
+            access_key_id='minio',
+            secret_access_key='minio123')
+        ''')
 
-    assert int(node2.query("SELECT count(*) FROM test_rotated1")) == 1000
+    assert int(node2.query("SELECT count(*) FROM test_rotated_test1")) == 1000
+    assert int(node2.query("SELECT count(*) FROM test_rotated_test2")) == 1000
 
