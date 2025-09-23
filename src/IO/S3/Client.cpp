@@ -838,7 +838,7 @@ void Client::slowDownAfterRetryableError() const
 
         /// Adds jitter: a random factor in the range [100%, 110%] to the delay.
         /// This prevents synchronized retries, reducing the risk of overwhelming the S3 server.
-        std::uniform_real_distribution<double> dist(1.0, 1.1);
+        std::uniform_real_distribution<double> dist(1.0, 1.0 + clamp(client_configuration.retry_strategy.jitter_factor, 0.1, 1.0));
         double jitter = dist(thread_local_rng);
         sleep_ms = static_cast<UInt64>(jitter * sleep_ms);
 
@@ -1114,7 +1114,7 @@ std::unique_ptr<S3::Client> ClientFactory::create( // NOLINT
     if (client_configuration.s3_slow_all_threads_after_retryable_error)
     {
         auto configuration = client_configuration.retry_strategy;
-        configuration.max_retries = 1;
+        configuration.max_retries = 0;
         client_configuration.retryStrategy = std::make_shared<Client::RetryStrategy>(configuration);
     }
     else
